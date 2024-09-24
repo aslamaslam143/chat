@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-User Chat App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #fff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .chat-header {
+            padding: 20px;
+            background-color: #3498db;
+            color: white;
+            font-size: 20px;
+            text-align: center;
+        }
+        .chat-body {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-body .message {
+            margin-bottom: 15px;
+            max-width: 60%;
+            padding: 10px;
+            border-radius: 10px;
+            position: relative;
+        }
+        .chat-body .message.sent {
+            background-color: #1abc9c;
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-body .message.received {
+            background-color: #bdc3c7;
+            color: black;
+            align-self: flex-start;
+        }
+        .message-input {
+            display: flex;
+            padding: 20px;
+            background-color: white;
+            border-top: 1px solid #ddd;
+        }
+        .message-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .message-input button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .message-input button:hover {
+            background-color: #2980b9;
+        }
+        .name-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+            background-color: #fff;
+        }
+        .name-container input {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 400px;
+        }
+        .name-container button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="name-container" id="name-container">
+        <h2>Enter Your Name</h2>
+        <input type="text" id="username" placeholder="Your Name" required>
+        <button id="start-chat">Start Chat</button>
+    </div>
+
+    <div class="chat-container" id="chat-container" style="display: none;">
+        <div class="chat-header">Chat Room</div>
+        <div class="chat-body" id="chat-body"></div>
+        <div class="message-input">
+            <input type="text" id="message" placeholder="Type a message..." required>
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <!-- Include Socket.io -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io(); // Connect to the server
+        const chatContainer = document.getElementById('chat-container');
+        const nameContainer = document.getElementById('name-container');
+        const chatBody = document.getElementById('chat-body');
+        const messageInput = document.getElementById('message');
+        const sendBtn = document.getElementById('send-btn');
+        const usernameInput = document.getElementById('username');
+
+        let username = localStorage.getItem('username') || '';
+
+        // If username exists in local storage, show the chat container
+        if (username) {
+            nameContainer.style.display = 'none'; // Hide name input
+            chatContainer.style.display = 'flex'; // Show chat container
+            socket.emit('new user', username); // Notify server of new user
+        }
+
+        // Start chat functionality
+        document.getElementById('start-chat').addEventListener('click', () => {
+            username = usernameInput.value.trim();
+            if (username) {
+                localStorage.setItem('username', username); // Store username in local storage
+                nameContainer.style.display = 'none'; // Hide name input
+                chatContainer.style.display = 'flex'; // Show chat container
+                socket.emit('new user', username); // Notify server of new user
+            }
+        });
+
+        // Event listener to send a message
+        sendBtn.addEventListener('click', sendMessage);
+
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText === '') return;
+
+            // Emit the message to the server
+            const msg = { from: username, message: messageText };
+            socket.emit('chat message', msg);
+            addMessageToChat(msg, 'sent');
+            messageInput.value = ''; // Clear the input field
+        }
+
+        // Listen for messages from the server
+        socket.on('chat message', (msg) => {
+            addMessageToChat(msg, 'received');
+        });
+
+        function addMessageToChat(msg, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            messageDiv.innerText = `${msg.from}: ${msg.message}`;
+            chatBody.appendChild(messageDiv);
+            chatBody.scrollTop = chatBody.scrollHeight; // Scroll to the latest message
+        }
+
+        // Handle page visibility to update the chat
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                socket.emit('request messages'); // Request messages when tab is active
+            }
+        });
+    </script>
+    <!-- Include your Node.js server script here (if applicable) -->
+     <script src="server.js"></script>
+</body>
+</html>
